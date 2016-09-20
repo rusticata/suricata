@@ -1870,6 +1870,31 @@
         fi
     fi
 
+    AC_ARG_ENABLE(rusticata,
+                AS_HELP_STRING([--enable-rusticata],[Enable Rust-Suricata glue layer]),
+                [ enable_rusticata="yes"],
+                [ enable_rusticata="no"])
+    if test "$enable_rusticata" = "yes"; then
+            AC_ARG_WITH(librusticata_libraries,
+                    [  --with-librusticata-libraries=DIR    librusticata library directory],
+                    [with_librusticata_libraries="$withval"],[with_librusticata_libraries="no"])
+            if test "$with_librusticata_libraries" != "no"; then
+                LDFLAGS="${LDFLAGS}  -L${with_librusticata_libraries}"
+            fi
+            AC_CHECK_LIB(rusticata, rusticata_init, RUSTICATA="yes", RUSTICATA="no")
+            if test "$RUSTICATA" = "no"; then
+                echo
+                echo "   ERROR!  librusticata library not found"
+                echo
+                exit 1
+            fi
+            if test "$RUSTICATA" = "yes"; then
+                AC_DEFINE([HAVE_RUSTICATA],[1],[librusticata available])
+                LIBS="${LIBS} -lrusticata"
+                enable_rusticata="yes"
+            fi
+    fi
+
 # get cache line size
     AC_PATH_PROG(HAVE_GETCONF_CMD, getconf, "no")
     if test "$HAVE_GETCONF_CMD" != "no"; then
@@ -2008,6 +2033,7 @@ SURICATA_BUILD_CONF="Suricata Configuration:
   CUDA enabled:                            ${enable_cuda}
   Hyperscan support:                       ${enable_hyperscan}
   Libnet support:                          ${enable_libnet}
+  Rusticata support:                       ${enable_rusticata}
 
   Suricatasc install:                      ${enable_python}
 
