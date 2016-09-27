@@ -37,6 +37,7 @@ struct _TlsParserState;
 typedef struct _TlsParserState TlsParserState;
 
 extern int32_t rusticata_init(struct rust_config *);
+extern uint32_t rusticata_probe_tls(uint8_t *input, uint32_t input_len, uint32_t *offset);
 extern TlsParserState * rusticata_tls_decode(uint8_t direction, const unsigned char* value, uint32_t len, TlsParserState* state) __attribute__((warn_unused_result));
 
 /* static methods */

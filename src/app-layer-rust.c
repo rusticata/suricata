@@ -47,9 +47,9 @@ static struct rust_config _rcfg = {
  * configuration file. */
 #define RUST_DEFAULT_PORT "443"
 
-/* The minimum size for an echo message. For some protocols this might
+/* The minimum size for a message. For some protocols this might
  * be the size of a header. */
-#define RUST_MIN_FRAME_LEN 1
+#define RUST_MIN_FRAME_LEN 3
 
 /* Enum of app-layer events for an echo protocol. Normally you might
  * have events for errors in parsing data, like unexpected data being
@@ -204,8 +204,10 @@ static int RustHasEvents(void *state)
 static AppProto RustProbingParser(uint8_t *input, uint32_t input_len,
     uint32_t *offset)
 {
-    /* Very simple test - if there is input, this is echo. */
-    if (input_len >= RUST_MIN_FRAME_LEN) {
+    if (input_len == 0)
+        return ALPROTO_UNKNOWN;
+
+    if (rusticata_probe_tls(input,input_len,offset) != 0) {
         SCLogNotice("Detected as ALPROTO_RUST.");
         return ALPROTO_RUST;
     }
