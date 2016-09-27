@@ -470,6 +470,7 @@ void RegisterRustParsers(void)
 #ifdef HAVE_RUSTICATA
     char *proto_name = "rust";
 
+    _rcfg.log_level = sc_log_global_log_level;
     rusticata_init(&_rcfg);
 #if 1
     {
