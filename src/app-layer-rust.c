@@ -63,10 +63,15 @@ static struct rust_config _rcfg = {
  */
 enum {
     RUST_DECODER_EVENT_EMPTY_MESSAGE,
+
+    RUST_TLS_DECODER_EVENT_OVERFLOW_HEARTBEAT,
+    RUST_TLS_DECODER_EVENT_INVALID_STATE,
 };
 
 SCEnumCharMap rust_decoder_event_table[] = {
     {"EMPTY_MESSAGE", RUST_DECODER_EVENT_EMPTY_MESSAGE},
+    { "OVERFLOW_HEARTBEAT_MESSAGE",  RUST_TLS_DECODER_EVENT_OVERFLOW_HEARTBEAT },
+    { "INVALID_STATE",  RUST_TLS_DECODER_EVENT_INVALID_STATE },
 };
 
 static RustTransaction *RustTxAlloc(RustState *echo)
@@ -109,7 +114,7 @@ static void *RustStateAlloc(void)
     if (unlikely(state == NULL)) {
         return NULL;
     }
-    state->tls_state = rusticata_new_tls_parser_state();
+    state->tls_state = r_tls_state_new();
     TAILQ_INIT(&state->tx_list);
     return state;
 }
@@ -124,7 +129,7 @@ static void RustStateFree(void *state)
         RustTxFree(tx);
     }
     if (rust_state->tls_state != NULL) {
-        rusticata_free_tls_parser_state(rust_state->tls_state);
+        r_tls_state_free(rust_state->tls_state);
     }
     SCFree(rust_state);
 }
@@ -207,7 +212,7 @@ static AppProto RustProbingParser(uint8_t *input, uint32_t input_len,
     if (input_len == 0)
         return ALPROTO_UNKNOWN;
 
-    if (rusticata_probe_tls(input,input_len,offset) != 0) {
+    if (r_tls_probe(input,input_len,offset) != 0) {
         SCLogNotice("Detected as ALPROTO_RUST.");
         return ALPROTO_RUST;
     }
@@ -225,9 +230,9 @@ static int RustParseToServer(Flow *f, void *state,
     SCLogNotice("Parsing packet to server: len=%"PRIu32, input_len);
 
     int direction = 0; /* to server */
-    void * p;
-    p = rusticata_tls_decode(direction, input, input_len, rust_state->tls_state);
-    rusticata_use_tls_parser_state(p, 0x1234);
+    int status;
+    status = r_tls_parse(direction, input, input_len, rust_state->tls_state);
+
 
     /* Likely connection closed, we can just return here. */
     if ((input == NULL || input_len == 0) &&
@@ -286,7 +291,16 @@ static int RustParseToServer(Flow *f, void *state,
         rust_state->events++;
     }
 
-end:    
+    if (R_STATUS_HAS_EVENTS(status)) {
+        uint32_t event;
+        event = r_tls_get_next_event(rust_state->tls_state);
+        if (event != 0xffff) {
+            AppLayerDecoderEventsSetEventRaw(&tx->decoder_events, event);
+        }
+    }
+
+
+end:
     return 0;
 }
 
@@ -299,9 +313,8 @@ static int RustParseToClient(Flow *f, void *state, AppLayerParserState *pstate,
     SCLogNotice("Parsing packet to client");
 
     int direction = 1; /* to client */
-    void * p;
-    p = rusticata_tls_decode(direction, input, input_len, rust_state->tls_state);
-    rusticata_use_tls_parser_state(p, 0x1234);
+    int status;
+    status = r_tls_parse(direction, input, input_len, rust_state->tls_state);
 
     /* Likely connection closed, we can just return here. */
     if ((input == NULL || input_len == 0) &&
@@ -358,6 +371,14 @@ static int RustParseToClient(Flow *f, void *state, AppLayerParserState *pstate,
     /* Set the response_done flag for transaction state checking in
      * RustGetStateProgress(). */
     tx->response_done = 1;
+
+    if (R_STATUS_HAS_EVENTS(status)) {
+        uint32_t event;
+        event = r_tls_get_next_event(rust_state->tls_state);
+        if (event != 0xffff) {
+            AppLayerDecoderEventsSetEventRaw(&tx->decoder_events, event);
+        }
+    }
 
 end:
     return 0;
@@ -474,17 +495,6 @@ void RegisterRustParsers(void)
 
     _rcfg.log_level = sc_log_global_log_level;
     rusticata_init(&_rcfg);
-#if 1
-    {
-        TlsParserState * p;
-        p = rusticata_new_tls_parser_state();
-        SCLogInfo("======= p: %p", p);
-
-        rusticata_use_tls_parser_state(p, 0x1234);
-
-        rusticata_free_tls_parser_state(p);
-    }
-#endif // 1
 
     /* Check if Rust TCP detection is enabled. If it does not exist in
      * the configuration file then it will be enabled by default. */
