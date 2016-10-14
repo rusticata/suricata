@@ -99,7 +99,7 @@ typedef struct RustState_ {
 
     TlsParserState * tls_state;
 
-    TAILQ_HEAD(, RustTransaction_) tx_list; /**< List of Rust transactions
+    TAILQ_HEAD(_RustTransaction, RustTransaction_) tx_list; /**< List of Rust transactions
                                        * associated with this
                                        * state. */
 

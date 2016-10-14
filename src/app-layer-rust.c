@@ -142,12 +142,12 @@ static void RustStateFree(void *state)
  */
 static void RustStateTxFree(void *state, uint64_t tx_id)
 {
-    RustState *echo = state;
+    RustState *rust_state = state;
     RustTransaction *tx = NULL, *ttx;
 
     SCLogNotice("Freeing transaction %"PRIu64, tx_id);
 
-    TAILQ_FOREACH_SAFE(tx, &echo->tx_list, next, ttx) {
+    TAILQ_FOREACH_SAFE(tx, &rust_state->tx_list, next, ttx) {
 
         /* Continue if this is not the transaction we are looking
          * for. */
@@ -156,7 +156,7 @@ static void RustStateTxFree(void *state, uint64_t tx_id)
         }
 
         /* Remove and free the transaction. */
-        TAILQ_REMOVE(&echo->tx_list, tx, next);
+        TAILQ_REMOVE(&rust_state->tx_list, tx, next);
         RustTxFree(tx);
         return;
     }
@@ -196,8 +196,8 @@ static AppLayerDecoderEvents *RustGetEvents(void *state, uint64_t tx_id)
 
 static int RustHasEvents(void *state)
 {
-    RustState *echo = state;
-    return echo->events;
+    RustState *rust_state = state;
+    return rust_state->events;
 }
 
 /**
@@ -246,49 +246,17 @@ static int RustParseToServer(Flow *f, void *state,
         return 0;
     }
 
-    /* Normally you would parse out data here and store it in the
-     * transaction object, but as this is echo, we'll just record the
-     * request data. */
-
-    /* Also, if this protocol may have a "protocol data unit" span
-     * multiple chunks of data, which is always a possibility with
-     * TCP, you may need to do some buffering here.
-     *
-     * For the sake of simplicity, buffering is left out here, but
-     * even for an echo protocol we may want to buffer until a new
-     * line is seen, assuming its text based.
-     */
-
-    /* Allocate a transaction.
-     *
-     * But note that if a "protocol data unit" is not received in one
-     * chunk of data, and the buffering is done on the transaction, we
-     * may need to look for the transaction that this newly recieved
-     * data belongs to.
-     */
-    RustTransaction *tx = RustTxAlloc(rust_state);
-    if (unlikely(tx == NULL)) {
-        SCLogNotice("Failed to allocate new Rust tx.");
-        goto end;
-    }
-    SCLogNotice("Allocated Rust tx %"PRIu64".", tx->tx_id);
-    
-    /* Make a copy of the request. */
-    tx->request_buffer = SCCalloc(1, input_len);
-    if (unlikely(tx->request_buffer == NULL)) {
-        goto end;
-    }
-    memcpy(tx->request_buffer, input, input_len);
-    tx->request_buffer_len = input_len;
-
-    /* Here we check for an empty message and create an app-layer
-     * event. */
-    if ((input_len == 1 && tx->request_buffer[0] == '\n') ||
-        (input_len == 2 && tx->request_buffer[0] == '\r')) {
-        SCLogNotice("Creating event for empty message.");
-        AppLayerDecoderEventsSetEventRaw(&tx->decoder_events,
-            RUST_DECODER_EVENT_EMPTY_MESSAGE);
-        rust_state->events++;
+    // Get or allocate a transaction
+    RustTransaction *tx = TAILQ_LAST(&rust_state->tx_list,_RustTransaction);
+    if (tx != NULL) {
+        SCLogNotice("Found transaction");
+    } else {
+        tx = RustTxAlloc(rust_state);
+        if (unlikely(tx == NULL)) {
+            SCLogNotice("Failed to allocate new Rust tx.");
+            goto end;
+        }
+        SCLogNotice("Allocated Rust tx %"PRIu64".", tx->tx_id);
     }
 
     if (R_STATUS_HAS_EVENTS(status)) {
@@ -308,9 +276,8 @@ static int RustParseToClient(Flow *f, void *state, AppLayerParserState *pstate,
     uint8_t *input, uint32_t input_len, void *local_data)
 {
     RustState *rust_state = state;
-    RustTransaction *tx = NULL, *ttx;;
 
-    SCLogNotice("Parsing packet to client");
+    SCLogDebug("Parsing packet to client");
 
     int direction = 1; /* to client */
     int status;
@@ -328,49 +295,17 @@ static int RustParseToClient(Flow *f, void *state, AppLayerParserState *pstate,
         return 0;
     }
 
-    /* Look up the existing transaction for this response. In the case
-     * of echo, it will be the most recent transaction on the
-     * RustState object. */
-
-    /* We should just grab the last transaction, but this is to
-     * illustrate how you might traverse the transaction list to find
-     * the transaction associated with this response. */
-    TAILQ_FOREACH(ttx, &rust_state->tx_list, next) {
-        tx = ttx;
-    }
-    
-    if (tx == NULL) {
-        SCLogNotice("Failed to find transaction for response on echo state %p.",
+    RustTransaction *tx = TAILQ_LAST(&rust_state->tx_list,_RustTransaction);
+    if (tx != NULL) {
+        SCLogNotice("Found transaction");
+    } else {
+        SCLogNotice("Failed to find transaction for response on rust state %p.",
             rust_state);
         goto end;
     }
 
-    SCLogNotice("Found transaction %"PRIu64" for response on echo state %p.",
+    SCLogNotice("Found transaction %"PRIu64" for response on rust state %p.",
         tx->tx_id, rust_state);
-
-    /* If the protocol requires multiple chunks of data to complete, you may
-     * run into the case where you have existing response data.
-     *
-     * In this case, we just log that there is existing data and free it. But
-     * you might want to realloc the buffer and append the data.
-     */
-    if (tx->response_buffer != NULL) {
-        SCLogNotice("WARNING: Transaction already has response data, "
-            "existing data will be overwritten.");
-        SCFree(tx->response_buffer);
-    }
-
-    /* Make a copy of the response. */
-    tx->response_buffer = SCCalloc(1, input_len);
-    if (unlikely(tx->response_buffer == NULL)) {
-        goto end;
-    }
-    memcpy(tx->response_buffer, input, input_len);
-    tx->response_buffer_len = input_len;
-
-    /* Set the response_done flag for transaction state checking in
-     * RustGetStateProgress(). */
-    tx->response_done = 1;
 
     if (R_STATUS_HAS_EVENTS(status)) {
         uint32_t event;
@@ -386,19 +321,19 @@ end:
 
 static uint64_t RustGetTxCnt(void *state)
 {
-    RustState *echo = state;
-    SCLogNotice("Current tx count is %"PRIu64".", echo->transaction_max);
-    return echo->transaction_max;
+    RustState *rust_state = state;
+    SCLogNotice("Current tx count is %"PRIu64".", rust_state->transaction_max);
+    return rust_state->transaction_max;
 }
 
 static void *RustGetTx(void *state, uint64_t tx_id)
 {
-    RustState *echo = state;
+    RustState *rust_state = state;
     RustTransaction *tx;
 
     SCLogNotice("Requested tx ID %"PRIu64".", tx_id);
 
-    TAILQ_FOREACH(tx, &echo->tx_list, next) {
+    TAILQ_FOREACH(tx, &rust_state->tx_list, next) {
         if (tx->tx_id == tx_id) {
             SCLogNotice("Transaction %"PRIu64" found, returning tx object %p.",
                 tx_id, tx);
@@ -449,12 +384,12 @@ static int RustGetAlstateProgressCompletionStatus(uint8_t direction) {
  */
 static int RustGetStateProgress(void *tx, uint8_t direction)
 {
-    RustTransaction *echotx = tx;
+    RustTransaction *rust_state_tx = tx;
 
     SCLogNotice("Transaction progress requested for tx ID %"PRIu64
-        ", direction=0x%02x", echotx->tx_id, direction);
+        ", direction=0x%02x", rust_state_tx->tx_id, direction);
 
-    if (direction & STREAM_TOCLIENT && echotx->response_done) {
+    if (direction & STREAM_TOCLIENT && rust_state_tx->response_done) {
         return 1;
     }
     else if (direction & STREAM_TOSERVER) {
@@ -517,7 +452,7 @@ void RegisterRustParsers(void)
             if (!AppLayerProtoDetectPPParseConfPorts("tcp", IPPROTO_TCP,
                     proto_name, ALPROTO_RUST, 0, RUST_MIN_FRAME_LEN,
                     RustProbingParser)) {
-                SCLogNotice("No echo app-layer configuration, enabling echo"
+                SCLogNotice("No Rust app-layer configuration, enabling Rust"
                     " detection TCP detection on port %s.",
                     RUST_DEFAULT_PORT);
                 AppLayerProtoDetectPPRegister(IPPROTO_TCP,
