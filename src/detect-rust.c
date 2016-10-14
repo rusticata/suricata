@@ -33,6 +33,13 @@
 #include "app-layer-rust.h"
 #include "detect-rust.h"
 
+#ifndef HAVE_RUSTICATA
+void DetectRustRegister(void) {
+}
+#endif /* HAVE_RUSTICATA */
+
+
+#ifdef HAVE_RUSTICATA
 /**
  * \brief Regex for parsing our keyword options
  */
@@ -375,3 +382,4 @@ void DetectRustRegisterTests(void) {
                    DetectRustSignatureTest01);
 #endif /* UNITTESTS */
 }
+#endif /* HAVE_RUSTICATA */
