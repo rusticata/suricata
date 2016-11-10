@@ -111,8 +111,8 @@ void DetectRustRegister(void) {
     sigmatch_table[DETECT_AL_RUST_TLS_KX_DH_BITS].Free  = DetectRustDataFree;
     //sigmatch_table[DETECT_AL_RUST_TLS_KX_DH_BITS].RegisterTests = DetectRustTlsKxBitstRegisterTests;
 
-    sigmatch_table[DETECT_AL_RUST_TLS_KX_ECDH_BITS].name = "rust.tls.kx_min_dh_bits";
-    sigmatch_table[DETECT_AL_RUST_TLS_KX_ECDH_BITS].desc = "match TLS/SSL DH parameters key bits";
+    sigmatch_table[DETECT_AL_RUST_TLS_KX_ECDH_BITS].name = "rust.tls.kx_min_ecdh_bits";
+    sigmatch_table[DETECT_AL_RUST_TLS_KX_ECDH_BITS].desc = "match TLS/SSL ECDH parameters key bits";
     sigmatch_table[DETECT_AL_RUST_TLS_KX_ECDH_BITS].url = "https://redmine.openinfosecfoundation.org/projects/suricata/wiki/TLS-keywords#tlssubject";
     sigmatch_table[DETECT_AL_RUST_TLS_KX_ECDH_BITS].Match = NULL;
     sigmatch_table[DETECT_AL_RUST_TLS_KX_ECDH_BITS].AppLayerMatch = DetectRustTlsKxECDHBitsMatch;
