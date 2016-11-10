@@ -47,6 +47,8 @@ void DetectRustRegister(void) {
 static pcre *parse_regex;
 static pcre_extra *parse_regex_study;
 
+static void DetectRustDataFree (void *);
+
 /* Prototypes of functions registered in DetectRustRegister below */
 static int DetectRustMatch (ThreadVars *, DetectEngineThreadCtx *,
         Packet *, Signature *, const SigMatchCtx *);
@@ -56,8 +58,15 @@ static void DetectRustRegisterTests (void);
 
 static int DetectRustTlsCipherMatch (ThreadVars *, DetectEngineThreadCtx *, Flow *, uint8_t, void *, Signature *, SigMatch *);
 static int DetectRustTlsCipherSetup (DetectEngineCtx *, Signature *, char *);
-static void DetectRustTlsCipherFree(void *);
 static void DetectRustTlsCiphertRegisterTests(void);
+
+static int DetectRustTlsKxDHBitsMatch (ThreadVars *, DetectEngineThreadCtx *, Flow *, uint8_t, void *, Signature *, SigMatch *);
+static int DetectRustTlsKxECDHBitsMatch (ThreadVars *, DetectEngineThreadCtx *, Flow *, uint8_t, void *, Signature *, SigMatch *);
+static int DetectRustTlsKxBitsSetup (DetectEngineCtx *, Signature *, char *);
+
+static int DetectRustTlsCipherKxMatch (ThreadVars *, DetectEngineThreadCtx *, Flow *, uint8_t, void *, Signature *, SigMatch *);
+static int DetectRustTlsCipherKxSetup (DetectEngineCtx *, Signature *, char *);
+static void DetectRustTlsCiphertKxRegisterTests(void);
 
 /**
  * \brief Registration function for rust: keyword
@@ -89,12 +98,50 @@ void DetectRustRegister(void) {
     sigmatch_table[DETECT_AL_RUST_TLS_CIPHER].AppLayerMatch = DetectRustTlsCipherMatch;
     //sigmatch_table[DETECT_AL_RUST_TLS_CIPHER].alproto = ALPROTO_TLS;
     sigmatch_table[DETECT_AL_RUST_TLS_CIPHER].Setup = DetectRustTlsCipherSetup;
-    sigmatch_table[DETECT_AL_RUST_TLS_CIPHER].Free  = DetectRustTlsCipherFree;
+    sigmatch_table[DETECT_AL_RUST_TLS_CIPHER].Free  = DetectRustDataFree;
     sigmatch_table[DETECT_AL_RUST_TLS_CIPHER].RegisterTests = DetectRustTlsCiphertRegisterTests;
+
+    sigmatch_table[DETECT_AL_RUST_TLS_KX_DH_BITS].name = "rust.tls.kx_min_dh_bits";
+    sigmatch_table[DETECT_AL_RUST_TLS_KX_DH_BITS].desc = "match TLS/SSL DH parameters key bits";
+    sigmatch_table[DETECT_AL_RUST_TLS_KX_DH_BITS].url = "https://redmine.openinfosecfoundation.org/projects/suricata/wiki/TLS-keywords#tlssubject";
+    sigmatch_table[DETECT_AL_RUST_TLS_KX_DH_BITS].Match = NULL;
+    sigmatch_table[DETECT_AL_RUST_TLS_KX_DH_BITS].AppLayerMatch = DetectRustTlsKxDHBitsMatch;
+    //sigmatch_table[DETECT_AL_RUST_TLS_KX_DH_BITS].alproto = ALPROTO_TLS;
+    sigmatch_table[DETECT_AL_RUST_TLS_KX_DH_BITS].Setup = DetectRustTlsKxBitsSetup;
+    sigmatch_table[DETECT_AL_RUST_TLS_KX_DH_BITS].Free  = DetectRustDataFree;
+    //sigmatch_table[DETECT_AL_RUST_TLS_KX_DH_BITS].RegisterTests = DetectRustTlsKxBitstRegisterTests;
+
+    sigmatch_table[DETECT_AL_RUST_TLS_KX_ECDH_BITS].name = "rust.tls.kx_min_dh_bits";
+    sigmatch_table[DETECT_AL_RUST_TLS_KX_ECDH_BITS].desc = "match TLS/SSL DH parameters key bits";
+    sigmatch_table[DETECT_AL_RUST_TLS_KX_ECDH_BITS].url = "https://redmine.openinfosecfoundation.org/projects/suricata/wiki/TLS-keywords#tlssubject";
+    sigmatch_table[DETECT_AL_RUST_TLS_KX_ECDH_BITS].Match = NULL;
+    sigmatch_table[DETECT_AL_RUST_TLS_KX_ECDH_BITS].AppLayerMatch = DetectRustTlsKxECDHBitsMatch;
+    //sigmatch_table[DETECT_AL_RUST_TLS_KX_ECDH_BITS].alproto = ALPROTO_TLS;
+    sigmatch_table[DETECT_AL_RUST_TLS_KX_ECDH_BITS].Setup = DetectRustTlsKxBitsSetup;
+    sigmatch_table[DETECT_AL_RUST_TLS_KX_ECDH_BITS].Free  = DetectRustDataFree;
+    //sigmatch_table[DETECT_AL_RUST_TLS_KX_ECDH_BITS].RegisterTests = DetectRustTlsKxBitstRegisterTests;
+
+    sigmatch_table[DETECT_AL_RUST_TLS_CIPHER_KX].name = "rust.tls.cipher.kx";
+    sigmatch_table[DETECT_AL_RUST_TLS_CIPHER_KX].desc = "match TLS/SSL cipher key exchange method";
+    sigmatch_table[DETECT_AL_RUST_TLS_CIPHER_KX].url = "https://redmine.openinfosecfoundation.org/projects/suricata/wiki/TLS-keywords#tlssubject";
+    sigmatch_table[DETECT_AL_RUST_TLS_CIPHER_KX].Match = NULL;
+    sigmatch_table[DETECT_AL_RUST_TLS_CIPHER_KX].AppLayerMatch = DetectRustTlsCipherKxMatch;
+    //sigmatch_table[DETECT_AL_RUST_TLS_CIPHER_KX].alproto = ALPROTO_TLS;
+    sigmatch_table[DETECT_AL_RUST_TLS_CIPHER_KX].Setup = DetectRustTlsCipherKxSetup;
+    sigmatch_table[DETECT_AL_RUST_TLS_CIPHER_KX].Free  = DetectRustDataFree;
+    sigmatch_table[DETECT_AL_RUST_TLS_CIPHER_KX].RegisterTests = DetectRustTlsCiphertKxRegisterTests;
 
 
     /* set up the PCRE for keyword parsing */
     DetectSetupParseRegexes(PARSE_REGEX, &parse_regex, &parse_regex_study);
+}
+
+static void DetectRustDataFree(void* ptr)
+{
+    DetectRustData *data = (DetectRustData *)ptr;
+    if (ptr == NULL)
+        return;
+    SCFree(data);
 }
 
 /**
@@ -316,15 +363,235 @@ error:
     return -1;
 }
 
-static void DetectRustTlsCipherFree(void* ptr)
+static void DetectRustTlsCiphertRegisterTests(void)
 {
-    DetectRustData *data = (DetectRustData *)ptr;
-    if (ptr == NULL)
-        return;
-    SCFree(data);
 }
 
-static void DetectRustTlsCiphertRegisterTests(void)
+static int DetectRustTlsKxDHBitsMatch (ThreadVars *t, DetectEngineThreadCtx *det_ctx, Flow *f, uint8_t flags, void *state, Signature *s, SigMatch *m)
+{
+    SCEnter();
+
+    DetectRustData *de_data = (DetectRustData *)m->ctx;
+
+    RustState *rust_state = (RustState *)state;
+    if (rust_state == NULL) {
+        SCLogDebug("no tls state, no match");
+        SCReturnInt(0);
+    }
+    int ret = 0;
+
+    uint32_t kx_bits = rusticata_tls_get_dh_key_bits(rust_state->tls_state);
+    SCLogNotice("**** dh_key_bits: %u", kx_bits);
+
+	if (kx_bits == 0) {
+		SCReturnInt(0);
+	}
+
+    uint32_t cipher = rusticata_tls_get_cipher(rust_state->tls_state);
+    if (cipher == 0)  {
+        SCReturnInt(0);
+    }
+
+    enum TlsCipherKx kx = rusticata_tls_kx_of_cipher(cipher);
+    // ignore match if not DH
+    // XXX can we disable the rule ?
+    if (!(kx == Kx_Dh || kx == Kx_Dhe)) {
+        SCReturnInt(0);
+    }
+
+    // XXX we should check if DH, or ECDH parameters: size is not comparable
+    if (kx_bits <= de_data->kx_bits)
+        ret = 1;
+
+    SCReturnInt(ret);
+}
+
+static int DetectRustTlsKxBitsSetup (DetectEngineCtx *de_ctx, Signature *s, char *str)
+{
+    DetectRustData *data = NULL;
+    SigMatch *sm = NULL;
+    long kx_bits;
+    char *endptr;
+
+    kx_bits = strtoul(str,&endptr,0);
+    if (endptr != NULL && *endptr!='\0') {
+        SCLogError(SC_ERR_CONFLICTING_RULE_KEYWORDS, "invalid TLS kx_bits value in rule.");
+        goto error;
+    }
+
+    data = SCMalloc(sizeof(DetectRustData));
+    if (unlikely(data == NULL))
+        goto error;
+
+    data->kx_bits = kx_bits;
+
+    /* Okay so far so good, lets get this into a SigMatch
+     * and put it in the Signature. */
+    sm = SigMatchAlloc();
+    if (sm == NULL)
+        goto error;
+
+    if (s->alproto != ALPROTO_UNKNOWN && s->alproto != ALPROTO_RUST) {
+        SCLogError(SC_ERR_CONFLICTING_RULE_KEYWORDS, "rule contains conflicting keywords.");
+        goto error;
+    }
+
+    sm->type = DETECT_AL_RUST_TLS_KX_DH_BITS;
+    sm->ctx = (void *)data;
+
+    s->flags |= SIG_FLAG_APPLAYER;
+    s->alproto = ALPROTO_RUST;
+
+    SigMatchAppendSMToList(s, sm, DETECT_SM_LIST_AMATCH);
+
+    return 0;
+
+error:
+    if (data != NULL)
+        SCFree(data);
+    return -1;
+}
+
+static int DetectRustTlsKxECDHBitsMatch (ThreadVars *t, DetectEngineThreadCtx *det_ctx, Flow *f, uint8_t flags, void *state, Signature *s, SigMatch *m)
+{
+    SCEnter();
+
+    DetectRustData *de_data = (DetectRustData *)m->ctx;
+
+    RustState *rust_state = (RustState *)state;
+    if (rust_state == NULL) {
+        SCLogDebug("no tls state, no match");
+        SCReturnInt(0);
+    }
+    int ret = 0;
+
+    uint32_t kx_bits = rusticata_tls_get_dh_key_bits(rust_state->tls_state);
+    SCLogNotice("**** ecdh_key_bits: %u", kx_bits);
+
+	if (kx_bits == 0) {
+		SCReturnInt(0);
+	}
+
+    uint32_t cipher = rusticata_tls_get_cipher(rust_state->tls_state);
+    if (cipher == 0)  {
+        SCReturnInt(0);
+    }
+
+    enum TlsCipherKx kx = rusticata_tls_kx_of_cipher(cipher);
+    // ignore match if not ECDH
+    // XXX can we disable the rule ?
+    if (!(kx == Kx_Ecdh || kx == Kx_Ecdhe)) {
+        SCReturnInt(0);
+    }
+
+    if (kx_bits <= de_data->kx_bits)
+        ret = 1;
+
+    SCReturnInt(ret);
+}
+
+static int DetectRustTlsCipherKxMatch (ThreadVars *t, DetectEngineThreadCtx *det_ctx, Flow *f, uint8_t flags, void *state, Signature *s, SigMatch *m)
+{
+    SCEnter();
+
+    DetectRustData *de_data = (DetectRustData *)m->ctx;
+
+    RustState *rust_state = (RustState *)state;
+    if (rust_state == NULL) {
+        SCLogDebug("no tls state, no match");
+        SCReturnInt(0);
+    }
+    int ret = 0;
+
+    uint32_t cipher = rusticata_tls_get_cipher(rust_state->tls_state);
+
+    SCLogDebug("**** cipher: 0x%x", cipher);
+
+    enum TlsCipherKx kx = rusticata_tls_kx_of_cipher(cipher);
+
+    SCLogDebug("**** cipher kx: 0x%x", kx);
+
+    if (kx == de_data->kx)
+        ret = 1;
+
+    SCReturnInt(ret);
+}
+
+static enum TlsCipherKx _tls_cipher_kx_of_string(const char *str)
+{
+    if (strcasecmp("adh",str)==0 || strcasecmp("dh",str)==0)
+        return Kx_Dh;
+
+    if (strcasecmp("dhe",str)==0)
+        return Kx_Dhe;
+
+    if (strcasecmp("ecdh",str)==0)
+        return Kx_Ecdh;
+
+    if (strcasecmp("ecdhe",str)==0)
+        return Kx_Ecdhe;
+
+    if (strcasecmp("rsa",str)==0)
+        return Kx_Rsa;
+
+    if (strcasecmp("psk",str)==0)
+        return Kx_Psk;
+
+    if (strcasecmp("srp",str)==0)
+        return Kx_Srp;
+
+    if (strcasecmp("krb5",str)==0)
+        return Kx_Krb5;
+
+    return (uint32_t)-1;
+}
+
+static int DetectRustTlsCipherKxSetup (DetectEngineCtx *de_ctx, Signature *s, char *str)
+{
+    DetectRustData *data = NULL;
+    SigMatch *sm = NULL;
+    enum TlsCipherKx kx;
+
+    kx = _tls_cipher_kx_of_string(str);
+    if (kx == (uint32_t)-1) {
+        SCLogError(SC_ERR_CONFLICTING_RULE_KEYWORDS, "invalid TLS cipher kx name in rule.");
+        goto error;
+    }
+
+    data = SCMalloc(sizeof(DetectRustData));
+    if (unlikely(data == NULL))
+        goto error;
+
+    data->kx = kx;
+
+    /* Okay so far so good, lets get this into a SigMatch
+     * and put it in the Signature. */
+    sm = SigMatchAlloc();
+    if (sm == NULL)
+        goto error;
+
+    if (s->alproto != ALPROTO_UNKNOWN && s->alproto != ALPROTO_RUST) {
+        SCLogError(SC_ERR_CONFLICTING_RULE_KEYWORDS, "rule contains conflicting keywords.");
+        goto error;
+    }
+
+    sm->type = DETECT_AL_RUST_TLS_CIPHER_KX;
+    sm->ctx = (void *)data;
+
+    s->flags |= SIG_FLAG_APPLAYER;
+    s->alproto = ALPROTO_RUST;
+
+    SigMatchAppendSMToList(s, sm, DETECT_SM_LIST_AMATCH);
+
+    return 0;
+
+error:
+    if (data != NULL)
+        SCFree(data);
+    return -1;
+}
+
+static void DetectRustTlsCiphertKxRegisterTests(void)
 {
 }
 

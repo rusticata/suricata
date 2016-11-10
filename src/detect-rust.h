@@ -24,6 +24,8 @@
 #ifndef __DETECT_RUST_H__
 #define __DETECT_RUST_H__
 
+#include "rusticata.h"
+
 /** Per keyword data. This is set up by the DetectRustSetup() function.
  *  Each signature will have an instance of DetectRustData per occurence
  *  of the keyword.
@@ -31,6 +33,8 @@
  */
 typedef struct DetectRustData_ {
     uint32_t cipher_id;
+    uint32_t kx_bits;
+    enum TlsCipherKx kx;
     uint8_t arg1;
     uint8_t arg2;
 } DetectRustData;

@@ -22,51 +22,12 @@
 
 #include "queue.h"
 
+#include "rusticata.h"
+
 void RegisterRustParsers(void);
 void RustParserRegisterTests(void);
 
 #ifdef HAVE_RUSTICATA
-
-#define R_STATUS_EVENTS   0x0100
-
-#define R_STATUS_OK       0x0000
-#define R_STATUS_FAIL     0x0001
-
-#define R_STATUS_EV_MASK  0x0f00
-#define R_STATUS_MASK     0x00ff
-
-#define R_STATUS_IS_OK(status) ((status & R_STATUS_MASK)==R_STATUS_OK)
-#define R_STATUS_HAS_EVENTS(status) ((status & R_STATUS_EV_MASK)==R_STATUS_EVENTS)
-
-struct rust_config {
-	uint32_t magic;
-	void *log;
-	uint32_t log_level;
-};
-
-extern int32_t rusticata_init(struct rust_config *);
-
-struct _TlsParserState;
-typedef struct _TlsParserState TlsParserState;
-
-extern uint32_t r_tls_probe(uint8_t *input, uint32_t input_len, uint32_t *offset);
-extern uint32_t r_tls_parse(uint8_t direction, const unsigned char* value, uint32_t len, TlsParserState* state) __attribute__((warn_unused_result));
-
-extern uint32_t r_tls_get_next_event(TlsParserState *state);
-
-/* static methods */
-extern uint32_t rusticata_tls_cipher_of_string(const char *s);
-
-/* TlsState methods */
-extern uint32_t rusticata_tls_get_cipher(TlsParserState *state);
-
-// state functions
-extern TlsParserState * r_tls_state_new(void);
-extern void r_tls_state_free(TlsParserState *);
-
-// test function
-extern int rusticata_use_tls_parser_state(TlsParserState *, int32_t value);
-
 
 typedef struct RustTransaction_ {
 
