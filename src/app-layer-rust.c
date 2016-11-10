@@ -78,6 +78,8 @@ SCEnumCharMap rust_decoder_event_table[] = {
     { "RECORD_INCOMPLETE",  RUST_TLS_DECODER_EVENT_RECORD_INCOMPLETE },
     { "RECORD_WITH_EXTRA_BYTES",  RUST_TLS_DECODER_EVENT_RECORD_WITH_EXTRA_BYTES },
     { "RECORD_OVERFLOW",  RUST_TLS_DECODER_EVENT_RECORD_OVERFLOW },
+
+    { NULL, -1 },
 };
 
 static RustTransaction *RustTxAlloc(RustState *echo)
