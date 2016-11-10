@@ -61,8 +61,9 @@ static int DetectRustTlsCipherSetup (DetectEngineCtx *, Signature *, char *);
 static void DetectRustTlsCiphertRegisterTests(void);
 
 static int DetectRustTlsKxDHBitsMatch (ThreadVars *, DetectEngineThreadCtx *, Flow *, uint8_t, void *, Signature *, SigMatch *);
+static int DetectRustTlsKxDHBitsSetup (DetectEngineCtx *, Signature *, char *);
 static int DetectRustTlsKxECDHBitsMatch (ThreadVars *, DetectEngineThreadCtx *, Flow *, uint8_t, void *, Signature *, SigMatch *);
-static int DetectRustTlsKxBitsSetup (DetectEngineCtx *, Signature *, char *);
+static int DetectRustTlsKxECDHBitsSetup (DetectEngineCtx *, Signature *, char *);
 
 static int DetectRustTlsCipherKxMatch (ThreadVars *, DetectEngineThreadCtx *, Flow *, uint8_t, void *, Signature *, SigMatch *);
 static int DetectRustTlsCipherKxSetup (DetectEngineCtx *, Signature *, char *);
@@ -107,7 +108,7 @@ void DetectRustRegister(void) {
     sigmatch_table[DETECT_AL_RUST_TLS_KX_DH_BITS].Match = NULL;
     sigmatch_table[DETECT_AL_RUST_TLS_KX_DH_BITS].AppLayerMatch = DetectRustTlsKxDHBitsMatch;
     //sigmatch_table[DETECT_AL_RUST_TLS_KX_DH_BITS].alproto = ALPROTO_TLS;
-    sigmatch_table[DETECT_AL_RUST_TLS_KX_DH_BITS].Setup = DetectRustTlsKxBitsSetup;
+    sigmatch_table[DETECT_AL_RUST_TLS_KX_DH_BITS].Setup = DetectRustTlsKxDHBitsSetup;
     sigmatch_table[DETECT_AL_RUST_TLS_KX_DH_BITS].Free  = DetectRustDataFree;
     //sigmatch_table[DETECT_AL_RUST_TLS_KX_DH_BITS].RegisterTests = DetectRustTlsKxBitstRegisterTests;
 
@@ -117,7 +118,7 @@ void DetectRustRegister(void) {
     sigmatch_table[DETECT_AL_RUST_TLS_KX_ECDH_BITS].Match = NULL;
     sigmatch_table[DETECT_AL_RUST_TLS_KX_ECDH_BITS].AppLayerMatch = DetectRustTlsKxECDHBitsMatch;
     //sigmatch_table[DETECT_AL_RUST_TLS_KX_ECDH_BITS].alproto = ALPROTO_TLS;
-    sigmatch_table[DETECT_AL_RUST_TLS_KX_ECDH_BITS].Setup = DetectRustTlsKxBitsSetup;
+    sigmatch_table[DETECT_AL_RUST_TLS_KX_ECDH_BITS].Setup = DetectRustTlsKxECDHBitsSetup;
     sigmatch_table[DETECT_AL_RUST_TLS_KX_ECDH_BITS].Free  = DetectRustDataFree;
     //sigmatch_table[DETECT_AL_RUST_TLS_KX_ECDH_BITS].RegisterTests = DetectRustTlsKxBitstRegisterTests;
 
@@ -367,6 +368,52 @@ static void DetectRustTlsCiphertRegisterTests(void)
 {
 }
 
+static int DetectRustTlsKxDHBitsSetup (DetectEngineCtx *de_ctx, Signature *s, char *str)
+{
+    DetectRustData *data = NULL;
+    SigMatch *sm = NULL;
+    long kx_bits;
+    char *endptr;
+
+    kx_bits = strtoul(str,&endptr,0);
+    if (endptr != NULL && *endptr!='\0') {
+        SCLogError(SC_ERR_CONFLICTING_RULE_KEYWORDS, "invalid TLS kx_dh_bits value in rule.");
+        goto error;
+    }
+
+    data = SCMalloc(sizeof(DetectRustData));
+    if (unlikely(data == NULL))
+        goto error;
+
+    data->kx_dh_bits = kx_bits;
+
+    /* Okay so far so good, lets get this into a SigMatch
+     * and put it in the Signature. */
+    sm = SigMatchAlloc();
+    if (sm == NULL)
+        goto error;
+
+    if (s->alproto != ALPROTO_UNKNOWN && s->alproto != ALPROTO_RUST) {
+        SCLogError(SC_ERR_CONFLICTING_RULE_KEYWORDS, "rule contains conflicting keywords.");
+        goto error;
+    }
+
+    sm->type = DETECT_AL_RUST_TLS_KX_DH_BITS;
+    sm->ctx = (void *)data;
+
+    s->flags |= SIG_FLAG_APPLAYER;
+    s->alproto = ALPROTO_RUST;
+
+    SigMatchAppendSMToList(s, sm, DETECT_SM_LIST_AMATCH);
+
+    return 0;
+
+error:
+    if (data != NULL)
+        SCFree(data);
+    return -1;
+}
+
 static int DetectRustTlsKxDHBitsMatch (ThreadVars *t, DetectEngineThreadCtx *det_ctx, Flow *f, uint8_t flags, void *state, Signature *s, SigMatch *m)
 {
     SCEnter();
@@ -380,13 +427,6 @@ static int DetectRustTlsKxDHBitsMatch (ThreadVars *t, DetectEngineThreadCtx *det
     }
     int ret = 0;
 
-    uint32_t kx_bits = rusticata_tls_get_dh_key_bits(rust_state->tls_state);
-    SCLogNotice("**** dh_key_bits: %u", kx_bits);
-
-	if (kx_bits == 0) {
-		SCReturnInt(0);
-	}
-
     uint32_t cipher = rusticata_tls_get_cipher(rust_state->tls_state);
     if (cipher == 0)  {
         SCReturnInt(0);
@@ -399,14 +439,20 @@ static int DetectRustTlsKxDHBitsMatch (ThreadVars *t, DetectEngineThreadCtx *det
         SCReturnInt(0);
     }
 
-    // XXX we should check if DH, or ECDH parameters: size is not comparable
-    if (kx_bits <= de_data->kx_bits)
+    uint32_t kx_bits = rusticata_tls_get_dh_key_bits(rust_state->tls_state);
+    SCLogNotice("**** dh_key_bits: %u", kx_bits);
+
+	if (kx_bits == 0) {
+		SCReturnInt(0);
+	}
+
+    if (kx_bits <= de_data->kx_dh_bits)
         ret = 1;
 
     SCReturnInt(ret);
 }
 
-static int DetectRustTlsKxBitsSetup (DetectEngineCtx *de_ctx, Signature *s, char *str)
+static int DetectRustTlsKxECDHBitsSetup (DetectEngineCtx *de_ctx, Signature *s, char *str)
 {
     DetectRustData *data = NULL;
     SigMatch *sm = NULL;
@@ -415,7 +461,7 @@ static int DetectRustTlsKxBitsSetup (DetectEngineCtx *de_ctx, Signature *s, char
 
     kx_bits = strtoul(str,&endptr,0);
     if (endptr != NULL && *endptr!='\0') {
-        SCLogError(SC_ERR_CONFLICTING_RULE_KEYWORDS, "invalid TLS kx_bits value in rule.");
+        SCLogError(SC_ERR_CONFLICTING_RULE_KEYWORDS, "invalid TLS kx_ecdh_bits value in rule.");
         goto error;
     }
 
@@ -423,7 +469,7 @@ static int DetectRustTlsKxBitsSetup (DetectEngineCtx *de_ctx, Signature *s, char
     if (unlikely(data == NULL))
         goto error;
 
-    data->kx_bits = kx_bits;
+    data->kx_ecdh_bits = kx_bits;
 
     /* Okay so far so good, lets get this into a SigMatch
      * and put it in the Signature. */
@@ -465,13 +511,6 @@ static int DetectRustTlsKxECDHBitsMatch (ThreadVars *t, DetectEngineThreadCtx *d
     }
     int ret = 0;
 
-    uint32_t kx_bits = rusticata_tls_get_dh_key_bits(rust_state->tls_state);
-    SCLogNotice("**** ecdh_key_bits: %u", kx_bits);
-
-	if (kx_bits == 0) {
-		SCReturnInt(0);
-	}
-
     uint32_t cipher = rusticata_tls_get_cipher(rust_state->tls_state);
     if (cipher == 0)  {
         SCReturnInt(0);
@@ -484,7 +523,14 @@ static int DetectRustTlsKxECDHBitsMatch (ThreadVars *t, DetectEngineThreadCtx *d
         SCReturnInt(0);
     }
 
-    if (kx_bits <= de_data->kx_bits)
+    uint32_t kx_bits = rusticata_tls_get_dh_key_bits(rust_state->tls_state);
+    SCLogNotice("**** ecdh_key_bits: %u", kx_bits);
+
+	if (kx_bits == 0) {
+		SCReturnInt(0);
+	}
+
+    if (kx_bits <= de_data->kx_ecdh_bits)
         ret = 1;
 
     SCReturnInt(ret);

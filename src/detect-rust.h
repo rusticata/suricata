@@ -33,7 +33,8 @@
  */
 typedef struct DetectRustData_ {
     uint32_t cipher_id;
-    uint32_t kx_bits;
+    uint32_t kx_dh_bits;
+    uint32_t kx_ecdh_bits;
     enum TlsCipherKx kx;
     uint8_t arg1;
     uint8_t arg2;
