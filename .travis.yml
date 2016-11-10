@@ -2,6 +2,11 @@
 # matrix below. We define so Travis doesn't think this is a Ruby
 # project.
 os: linux
+sudo: required
+dist: trusty
+branches:
+  only:
+    - rust
 language: c
 compiler: gcc
 
@@ -104,6 +109,8 @@ before_install:
             libcap-ng0 make libmagic-dev libnetfilter-queue-dev \
             libnetfilter-queue1 libnfnetlink-dev libnfnetlink0 \
             libhiredis-dev
+        curl https://static.rust-lang.org/rustup.sh | \
+            sh -s -- --add-target=$TARGET -y --prefix=`rustc --print sysroot`
 
 
         if [[ "$ENABLE_COCCI" == "yes" ]]; then
@@ -122,4 +129,5 @@ before_install:
             pcre hiredis
     fi
   - ./qa/travis-libhtp.sh
+  - ./qa/travis-rusticata.sh
 
