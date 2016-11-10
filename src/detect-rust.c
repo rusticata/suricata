@@ -543,7 +543,7 @@ static enum TlsCipherKx _tls_cipher_kx_of_string(const char *str)
     if (strcasecmp("krb5",str)==0)
         return Kx_Krb5;
 
-    return (uint32_t)-1;
+    return (enum TlsCipherKx)-1;
 }
 
 static int DetectRustTlsCipherKxSetup (DetectEngineCtx *de_ctx, Signature *s, char *str)
@@ -553,7 +553,7 @@ static int DetectRustTlsCipherKxSetup (DetectEngineCtx *de_ctx, Signature *s, ch
     enum TlsCipherKx kx;
 
     kx = _tls_cipher_kx_of_string(str);
-    if (kx == (uint32_t)-1) {
+    if (kx == (enum TlsCipherKx)-1) {
         SCLogError(SC_ERR_CONFLICTING_RULE_KEYWORDS, "invalid TLS cipher kx name in rule.");
         goto error;
     }
