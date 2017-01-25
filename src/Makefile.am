@@ -453,8 +453,7 @@ AM_CPPFLAGS = $(all_includes)
 
 # the library search path.
 suricata_LDFLAGS = $(all_libraries) ${SECLDFLAGS} \
-	../rust/dns/target/release/libsuricata_rust.a \
-	../rust/quic/target/release/libquic_parser.a \
+	../rust/suricata-rs/target/release/libsuricata_rs.a \
     -ldl
 suricata_LDADD = $(HTP_LDADD)
 

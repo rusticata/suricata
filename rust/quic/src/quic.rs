@@ -6,9 +6,9 @@ use std::mem;
 use libc::c_char;
 //use std::ffi::CStr;
 
-use nom::{rest};
-use nom::IResult;
-use rparser::*;
+use nom::{rest,IResult};
+use suricata_interface::macros::*;
+use suricata_interface::rparser::*;
 
 use std::io::Write;
 
@@ -22,32 +22,6 @@ pub fn bytes_to_u64(s: &[u8]) -> Result<u64, &'static str> {
 
     Ok(u)
 }
-
-macro_rules! println_stderr(
-    ($($arg:tt)*) => { {
-        let r = writeln!(&mut ::std::io::stderr(), $($arg)*);
-        r.expect("failed printing to stderr");
-    } }
-);
-
-pub struct QuicParserState<'a> {
-    pub o: Option<&'a[u8]>,
-    events: Vec<u32>,
-    counter: u64,
-}
-
-impl<'a> QuicParserState<'a> {
-    pub fn new(i: &'a[u8]) -> QuicParserState<'a> {
-        QuicParserState {
-            o:Some(i),
-            events:Vec::new(),
-            counter:0,
-        }
-    }
-}
-
-r_declare_state_new!(r_quic_state_new,QuicParserState,b"blah");
-r_declare_state_free!(r_quic_state_free,QuicParserState,{});
 
 #[derive(Debug,PartialEq)]
 pub struct QuicPacket<'a> {
@@ -97,38 +71,49 @@ named!(pub parse_quic<QuicPacket>,
    ))
 );
 
-struct QuicParser;
+pub struct QuicParser<'a> {
+    pub o: Option<&'a[u8]>,
+    events: Vec<u32>,
+    counter: u64,
+}
 
-impl<'a> RParser<QuicParserState<'a>> for QuicParser {
-    fn new_state() -> QuicParserState<'a> {
-        QuicParserState::new(b"blah")
-    }
-
-    fn probe(i: &[u8]) -> bool {
-        match parse_quic(i) {
-            IResult::Done(_, quic_packet) => {
-//                println!("rust::quic.rs::probe: match!");
-                true
-            }
-            IResult::Incomplete(_) => {
-                println!("rust: incomplete");
-                false
-            }
-            IResult::Error(_) => {
-                println!("rust: error");
-                false
-            }
+impl<'a> QuicParser<'a> {
+    pub fn new(i: &'a[u8]) -> QuicParser<'a> {
+        QuicParser {
+            o:Some(i),
+            events:Vec::new(),
+            counter:0,
         }
     }
+}
 
-    fn parse(this: &mut QuicParserState, i: &[u8], direction: u8) -> u32 {
+fn quic_probe(i: &[u8]) -> bool {
+    match parse_quic(i) {
+        IResult::Done(_, quic_packet) => {
+//                println!("rust::quic.rs::probe: match!");
+            true
+        }
+        IResult::Incomplete(_) => {
+            println!("rust: incomplete");
+            false
+        }
+        IResult::Error(_) => {
+            println!("rust: error");
+            false
+        }
+    }
+}
+
+
+impl<'a> RParser for QuicParser<'a> {
+    fn parse(&mut self, i: &[u8], direction: u8) -> u32 {
         match parse_quic(i) {
             IResult::Done(_, quic_packet) => {
                 //println!("quic.rs: {:?}", quic_packet);
 
                 let my_int = bytes_to_u64(quic_packet.seq_id); 
-                this.counter = this.counter + 1;
-//                println!("quic.rs: SEQ {:?} raw {:?}, msg {}", my_int, quic_packet.seq_id, this.counter);
+                self.counter = self.counter + 1;
+//                println!("quic.rs: SEQ {:?} raw {:?}, msg {}", my_int, quic_packet.seq_id, self.counter);
             }
             IResult::Incomplete(_) => {
                 println!("rust: incomplete");
@@ -146,8 +131,13 @@ impl<'a> RParser<QuicParserState<'a>> for QuicParser {
     }
 }
 
-r_implement_probe!(r_quic_probe,QuicParser);
+r_declare_state_new!(r_quic_state_new,QuicParser,b"blah");
+r_declare_state_free!(r_quic_state_free,QuicParser,{});
+
+r_implement_probe!(r_quic_probe,quic_probe);
 r_implement_parse!(r_quic_parse,QuicParser);
+
+
 
 #[cfg(test)]
 mod tests {

@@ -1,5 +1,8 @@
-all:
-	cargo build --release
+EXTRA_DIST = Cargo.toml \
+	     src/lib.rs
 
-clean:
-	cargo clean
+clean-local:
+	-cargo clean
+
+check:
+	cargo test
