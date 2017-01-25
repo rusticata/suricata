@@ -366,6 +366,15 @@
         esac
     ])
 
+    AC_CHECK_PROG(CARGO, [cargo], [yes], [no])
+    AS_IF(test x$CARGO = xno,
+        AC_MSG_ERROR([cargo is required])
+    )
+    AC_CHECK_PROG(RUSTC, [rustc], [yes], [no])
+    AS_IF(test x$RUSTC = xno,
+        AC_MSG_ERROR([rustc is required])
+    )
+
 # options
 
   # enable the running of unit tests
@@ -1992,7 +2001,7 @@ AC_SUBST(CONFIGURE_PREFIX)
 AC_SUBST(CONFIGURE_SYSCONDIR)
 AC_SUBST(CONFIGURE_LOCALSTATEDIR)
 
-AC_OUTPUT(Makefile src/Makefile rust/Makefile rust/dns/Makefile rust/quic/Makefile rust/nfs/Makefile rust/nfs/nfs3tcp/Makefile qa/Makefile qa/coccinelle/Makefile rules/Makefile doc/Makefile doc/userguide/Makefile contrib/Makefile contrib/file_processor/Makefile contrib/file_processor/Action/Makefile contrib/file_processor/Processor/Makefile contrib/tile_pcie_logd/Makefile suricata.yaml scripts/Makefile scripts/suricatasc/Makefile scripts/suricatasc/suricatasc)
+AC_OUTPUT(Makefile src/Makefile rust/Makefile rust/suricata-rs/Makefile rust/suricata-interface/Makefile rust/dns/Makefile rust/nfs/Makefile rust/nfs/nfs3tcp/Makefile rust/quic/Makefile rust/smb/Makefile qa/Makefile qa/coccinelle/Makefile rules/Makefile doc/Makefile doc/userguide/Makefile contrib/Makefile contrib/file_processor/Makefile contrib/file_processor/Action/Makefile contrib/file_processor/Processor/Makefile contrib/tile_pcie_logd/Makefile suricata.yaml scripts/Makefile scripts/suricatasc/Makefile scripts/suricatasc/suricatasc)
 
 SURICATA_BUILD_CONF="Suricata Configuration:
   AF_PACKET support:                       ${enable_af_packet}
