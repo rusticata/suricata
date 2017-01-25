@@ -3,9 +3,8 @@ extern crate libc;
 #[macro_use]
 extern crate nom;
 
-pub use rparser::*;
 #[macro_use]
-pub mod rparser;
+extern crate suricata_interface;
 
 pub use quic::*;
 pub mod quic;

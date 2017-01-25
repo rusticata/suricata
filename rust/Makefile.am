@@ -1,1 +1,1 @@
-SUBDIRS = dns quic
+SUBDIRS = suricata-rs suricata-interface dns nfs quic

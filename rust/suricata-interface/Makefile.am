@@ -1,6 +1,6 @@
 EXTRA_DIST = Cargo.toml \
 	     src/lib.rs \
-	     src/quic.rs
+	     src/rparser.rs
 
 clean-local:
 	-cargo clean

@@ -1,6 +1,8 @@
 EXTRA_DIST = Cargo.toml \
-	     src/lib.rs \
-	     src/quic.rs
+	     src/lib.rs
+
+all-local:
+	cargo build --release
 
 clean-local:
 	-cargo clean
