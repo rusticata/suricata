@@ -172,6 +172,7 @@
 #include "host-storage.h"
 
 #include "util-lua.h"
+#include "util-rust.h"
 
 /*
  * we put this here, because we only use it here in main.
@@ -2680,6 +2681,8 @@ static int PostConfLoadedSetup(SCInstance *suri)
     }
 
     RegisterAllModules();
+
+    RustInit();
 
     AppLayerHtpNeedFileInspection();
 
