@@ -17,6 +17,7 @@ use log::LogLevelFilter;
 extern crate num_traits;
 
 extern crate ntp_parser;
+extern crate ssh_parser;
 extern crate tls_parser;
 
 const SURICATA_RUST_MAGIC : u32 = 0x72757374;
@@ -34,6 +35,9 @@ use suricata_interface::rparser::RParser;
 
 pub use ntp::*;
 pub mod ntp;
+
+pub use ssh::*;
+pub mod ssh;
 
 pub use tls::*;
 pub mod tls;
@@ -128,6 +132,11 @@ lazy_static! {
                                                    std::ptr::null(),
                                                    r_ntp_probe, r_generic_parse,
                                                    r_ntp_state_new, r_ntp_state_free));
+        m.insert("ssh".to_string(),RustParser::new("rust-ssh", 6, "22", 0,
+                                                   unsafe{ &mut ssh::ALPROTO_SSH },
+                                                   SSH_EVENTS.as_ptr() as *const c_void,
+                                                   r_ssh_probe, r_generic_parse,
+                                                   r_ssh_state_new, r_ssh_state_free));
         m.insert("tls".to_string(),RustParser::new("rust-tls", 6, "443", 0,
                                                    unsafe{ &mut tls::ALPROTO_TLS },
                                                    TLS_EVENTS.as_ptr() as *const c_void,
