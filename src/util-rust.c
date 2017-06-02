@@ -45,6 +45,8 @@ AppProto crust_register_alproto(const char *proto)
         return ALPROTO_NTP;
     else if (strcmp("rust-tls",proto)==0)
         return ALPROTO_TLS;
+    else if (strcmp("rust-ssh",proto)==0)
+        return ALPROTO_SSH;
     else {
         SCLogError(SC_ERR_INITIALIZATION, "Unknown Rust protocol");
         return -1;
