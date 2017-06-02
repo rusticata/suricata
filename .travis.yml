@@ -95,6 +95,36 @@ matrix:
         apt:
           packages:
             - *packages-without-jansson
+    # Linux, gcc, rust-stable.
+    - os: linux
+      sudo: required
+      compiler: gcc
+      env:
+        - NAME="linux,gcc,rust-stable"
+        - *default-cflags
+        - ARGS="--enable-rust"
+        - INSTALL_RUST="yes"
+        - RUST_CHANNEL="stable"
+      addons:
+        apt:
+          packages:
+            - curl
+            - *packages-without-jansson
+    # Linux, gcc, rust-nightly.
+    - os: linux
+      sudo: required
+      compiler: gcc
+      env:
+        - NAME="linux,gcc,rust-nightly"
+        - *default-cflags
+        - ARGS="--enable-rust"
+        - INSTALL_RUST="yes"
+        - RUST_CHANNEL="nightly"
+      addons:
+        apt:
+          packages:
+            - curl
+            - *packages-without-jansson
     # OSX 10.12, XCode 8.1
     - os: osx
       compiler: gcc
@@ -106,6 +136,11 @@ matrix:
 
 script:
   - sh ./autogen.sh
+  - |
+    if [[ "$INSTALL_RUST" == "yes" ]]; then
+        curl https://static.rust-lang.org/rustup.sh | \
+                sh -s -- --add-target=$TARGET -y --prefix=`rustc --print sysroot` --channel=$RUST_CHANNEL
+    fi
   - |
     if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
         export CFLAGS="${CFLAGS} ${EXTRA_CFLAGS}"
