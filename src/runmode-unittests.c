@@ -68,6 +68,7 @@
 
 #include "stream-tcp.h"
 
+#include "app-layer-protos.h"
 #include "app-layer-detect-proto.h"
 #include "app-layer-parser.h"
 #include "app-layer.h"
@@ -180,6 +181,7 @@ static void RegisterUnittests(void)
     SCClassConfRegisterTests();
     SCThresholdConfRegisterTests();
     SCRConfRegisterTests();
+    AppProtoRegisterTests();
 #ifdef __SC_CUDA_SUPPORT__
     SCCudaRegisterTests();
 #endif
