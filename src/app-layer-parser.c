@@ -1278,7 +1278,7 @@ void AppLayerParserRegisterProtocolParsers(void)
     RegisterSSHParsers();
     RegisterSMTPParsers();
     RegisterDNSUDPParsers();
-    RegisterDNSTCPParsers();
+    // RegisterDNSTCPParsers();
     RegisterModbusParsers();
     RegisterENIPUDPParsers();
     RegisterENIPTCPParsers();

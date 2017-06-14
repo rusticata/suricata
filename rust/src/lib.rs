@@ -18,6 +18,9 @@
 extern crate libc;
 
 #[macro_use]
+extern crate lazy_static;
+
+#[macro_use]
 extern crate nom;
 
 #[macro_use]
@@ -31,6 +34,12 @@ pub mod json;
 pub mod applayer;
 pub mod filecontainer;
 pub mod filetracker;
+
+#[macro_use]
+pub mod rparser;
+pub mod cparser;
+
+pub mod init;
 
 #[cfg(feature = "lua")]
 pub mod lua;

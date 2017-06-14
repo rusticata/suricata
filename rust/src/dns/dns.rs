@@ -26,6 +26,33 @@ use applayer::LoggerFlags;
 use core;
 use dns::parser;
 
+use std::ffi::CString;
+
+use rparser::RParser;
+use cparser::{RustParser,StringToAppProto};
+
+lazy_static! {
+    pub static ref ALPROTO_DNS : u16 = {
+        let name = "dns";
+        let al_proto = unsafe{ StringToAppProto(name.as_ptr()) };
+        if (al_proto == 0) || (al_proto == 0xffff) {
+            panic!("Application layer protocol registration failed for protocol {}", name);
+        };
+        al_proto
+    };
+
+    pub static ref DnsTCPParser : RustParser = {
+        RustParser::new(
+            "dns", 6, "53", 0,
+            *ALPROTO_DNS,
+            std::ptr::null(),
+            rs_dns_probe_tcp,
+            rs_dns_state_tcp_new, rs_dns_state_free
+        )
+    };
+
+}
+
 /// DNS record types.
 pub const DNS_RTYPE_A:     u16 = 1;
 pub const DNS_RTYPE_CNAME: u16 = 5;
@@ -514,6 +541,17 @@ impl DNSState {
     }
 }
 
+/// Declare DNSState as a generic parser
+impl RParser for DNSState {
+    fn parse_to_server(&mut self, _f: core::Flow, i: &[u8], _d:u8) -> u32 {
+        self.parse_request_tcp(i) as u32
+    }
+
+    fn parse_to_client(&mut self, _f: core::Flow, i: &[u8], _d:u8) -> u32 {
+        self.parse_response_tcp(i) as u32
+    }
+}
+
 /// Implement Drop for DNSState as transactions need to do some
 /// explicit cleanup.
 impl Drop for DNSState {
@@ -526,25 +564,17 @@ impl Drop for DNSState {
 #[no_mangle]
 pub extern "C" fn rs_dns_state_new() -> *mut libc::c_void {
     let state = DNSState::new();
-    let boxed = Box::new(state);
-    return unsafe{transmute(boxed)};
+    r_wrap_state_return!(DNSState,state)
 }
 
 /// Returns *mut DNSState
 #[no_mangle]
 pub extern "C" fn rs_dns_state_tcp_new() -> *mut libc::c_void {
     let state = DNSState::new_tcp();
-    let boxed = Box::new(state);
-    return unsafe{transmute(boxed)};
+    r_wrap_state_return!(DNSState,state)
 }
 
-/// Params:
-/// - state: *mut DNSState as void pointer
-#[no_mangle]
-pub extern "C" fn rs_dns_state_free(state: *mut libc::c_void) {
-    // Just unbox...
-    let _drop: Box<DNSState> = unsafe{transmute(state)};
-}
+r_declare_state_free!(rs_dns_state_free,DNSState);
 
 #[no_mangle]
 pub extern "C" fn rs_dns_state_tx_free(state: &mut DNSState,
@@ -811,8 +841,9 @@ pub extern "C" fn rs_dns_probe(input: *const libc::uint8_t, len: libc::uint32_t)
 
 #[no_mangle]
 pub extern "C" fn rs_dns_probe_tcp(input: *const libc::uint8_t,
-                                   len: libc::uint32_t)
-                                   -> libc::uint8_t
+                                   len: libc::uint32_t,
+                                   _offset: *const libc::uint32_t)
+                                   -> libc::uint16_t
 {
     let slice: &[u8] = unsafe {
         std::slice::from_raw_parts(input as *mut u8, len as usize)
@@ -822,7 +853,7 @@ pub extern "C" fn rs_dns_probe_tcp(input: *const libc::uint8_t,
             if rem.len() >= len as usize {
                 match parser::dns_parse_request(rem) {
                     nom::IResult::Done(_, _) => {
-                        return 1;
+                        return *ALPROTO_DNS;
                     }
                     _ => {}
                 }

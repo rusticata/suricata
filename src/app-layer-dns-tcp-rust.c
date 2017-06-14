@@ -56,7 +56,7 @@ static uint16_t RustDNSTCPProbe(uint8_t *input, uint32_t len, uint32_t *offset)
     }
 
     // Validate and return ALPROTO_FAILED if needed.
-    if (!rs_dns_probe_tcp(input, len)) {
+    if (!rs_dns_probe_tcp(input, len, offset)) {
         return ALPROTO_FAILED;
     }
 

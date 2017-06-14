@@ -445,6 +445,7 @@ util-rohash.c util-rohash.h \
 util-rule-vars.c util-rule-vars.h \
 util-runmodes.c util-runmodes.h \
 util-running-modes.c util-running-modes.h \
+util-rust.c util-rust.h \
 util-signal.c util-signal.h \
 util-spm-bm.c util-spm-bm.h \
 util-spm-bs2bm.c util-spm-bs2bm.h \

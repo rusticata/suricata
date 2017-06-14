@@ -46,6 +46,8 @@ template = """/* Copyright (C) 2017 Open Information Security Foundation
 
 # Map of Rust types to C types.
 type_map = {
+    "c_char": "char",
+    "c_void": "c_void",
     "bool": "bool",
     "i8": "int8_t",
     "i16" :"int16_t",
@@ -59,15 +61,19 @@ type_map = {
 
     "libc::c_void": "void",
 
+    "libc::c_char": "char",
     "libc::c_int": "int",
     "c_int": "int",
     "libc::int8_t": "int8_t",
+
+    "uint8_t": "uint8_t",
 
     "libc::uint8_t": "uint8_t",
     "libc::uint16_t": "uint16_t",
     "libc::uint32_t": "uint32_t",
     "libc::uint64_t": "uint64_t",
 
+    "SuricataConfig": "SuricataConfig",
     "SuricataContext": "SuricataContext",
     "SuricataFileContext": "SuricataFileContext",
     "FileContainer": "FileContainer",

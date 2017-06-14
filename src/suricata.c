@@ -172,6 +172,7 @@
 #include "host-storage.h"
 
 #include "util-lua.h"
+#include "util-rust.h"
 #include "log-filestore.h"
 
 #ifdef HAVE_RUST
@@ -2690,6 +2691,8 @@ static int PostConfLoadedSetup(SCInstance *suri)
     }
 
     RegisterAllModules();
+
+    RustInit();
 
     AppLayerHtpNeedFileInspection();
 
